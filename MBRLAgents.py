@@ -31,22 +31,25 @@ class DynaAgent:
             action = np.argmax(self.Q_sa[s])
         
         return action
-            
-        
         
     def update(self,s,a,r,done,s_next,n_planning_updates):
         # TO DO: Add Dyna update
-        
         self.transition_counts[s,a,s_next] += 1
         self.reward_sums[s,a,s_next] += r
-        estimate_transition = self.transition_counts[s,a,s_next] / np.sum(self.transition_counts[s,a, :])
         estimate_r = self.reward_sums[s,a,s_next] / self.transition_counts[s,a,s_next]
         self.Q_sa[s,a] += self.learning_rate * (r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
         
         for k in range(n_planning_updates):
-            s = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
-            a = np.random.choice(np.where(self.transition_counts[s] > 0)[0])
-            s_next = np.random.choice(np.where(estimate_transition * self.transition_counts[s,a] > 0)[0])
+            state_found = False
+            while not state_found:
+                s = np.random.choice(np.arange(self.n_states))
+                a = np.random.choice(np.arange(self.n_actions))
+                if np.sum(self.transition_counts[s,a]) > 0:
+                    state_found = True
+
+            estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
+            
+            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
             self.Q_sa[s,a] += self.learning_rate * (estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
 
     def evaluate(self,eval_env,n_eval_episodes=30, max_episode_length=100):
@@ -78,11 +81,20 @@ class PrioritizedSweepingAgent:
         
         self.Q_sa = np.zeros((n_states,n_actions))
         # TO DO: Initialize count tables, reward sum tables, priority queue
+        self.means_Q_sa = np.zeros((n_states, n_actions))
+        self.transition_counts = np.zeros((n_states,n_actions,n_states))
+        self.reward_sums = np.zeros((n_states,n_actions, n_states))
         
     def select_action(self, s, epsilon):
         # TO DO: Change this to e-greedy action selection
-        a = np.random.randint(0,self.n_actions) # Replace this with correct action selection
-        return a
+        
+        if np.random.rand() < epsilon:
+            action = np.random.randint(0, self.n_actions)
+        else:
+            action = np.argmax(self.Q_sa[s])
+        
+        return action
+        
         
     def update(self,s,a,r,done,s_next,n_planning_updates):
         
@@ -93,7 +105,31 @@ class PrioritizedSweepingAgent:
         # self.queue.put((-p,(s,a))) 
         # Retrieve the top (s,a) from the queue
         # _,(s,a) = self.queue.get() # get the top (s,a) for the queue
-        pass
+        self.transition_counts[s,a,s_next] += 1
+        self.reward_sums[s,a,s_next] += r
+        
+        estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
+        s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0], p=estimate_probability)
+        estimate_r = self.reward_sums[s,a,s_next] / np.sum(self.transition_counts[s,a])
+        
+        p = np.abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
+        if p > self.priority_cutoff:
+            self.queue.put((-p,(s,a)))
+        for k in range(n_planning_updates):
+            if self.queue.empty():
+                break
+            _,(s,a) = self.queue.get()
+            estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
+            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0], p=estimate_probability)
+            self.Q_sa[s,a] += self.learning_rate * (estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
+            
+            for s_prime in np.where(self.transition_counts[s,a] > 0)[0]:
+                r = self.reward_sums[s,a,s_prime] / self.transition_counts[s,a,s_prime]
+                p = np.abs(estimate_r + self.gamma * np.max(self.Q_sa[s_prime]) - self.Q_sa[s,a])
+                if p > self.priority_cutoff:
+                    self.queue.put((-p,(s,a)))
+                
+        
 
     def evaluate(self,eval_env,n_eval_episodes=30, max_episode_length=100):
         returns = []  # list to store the reward per episode
