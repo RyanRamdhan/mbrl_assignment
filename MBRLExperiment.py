@@ -49,11 +49,17 @@ def experiment():
         for wind_proportion in range(len(wind_proportions)):
             mean_rewards = run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportions[wind_proportion], best_parameters[agent][wind_proportion], eval_interval, agents[agent])
             smoothed_rewards = smooth(mean_rewards, window=151)
-            plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='wind:' + str(wind_proportions[wind_proportion]) + ', planning_update: ' + str(best_parameters[agent][wind_proportion]))
+            if agents[agent] == DynaAgent:
+                plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='dyna; wind: ' + str(wind_proportions[wind_proportion]) + ', planning_update: ' + str(best_parameters[agent][wind_proportion]))
+            else:
+                plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='prioritized sweeping; wind: ' + str(wind_proportions[wind_proportion]) + ', planning_update: ' + str(best_parameters[agent][wind_proportion]))
+    
+    #add baseline
+    mean_rewards = run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, 0.9, 0, eval_interval, agents[0])
+    smoothed_rewards = smooth(mean_rewards, window=151)
+    plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='baseline')
     plot.save('comparisonplot.png')    
             
-        
-    # IMPLEMENT YOUR EXPERIMENT HERE
 
 def run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportion, n_planning_updates, eval_interval, agents):
     # IMPLEMENT YOUR FUNCTION HERE
