@@ -9,7 +9,7 @@ By Thomas Moerland
 import numpy as np
 from MBRLEnvironment import WindyGridworld
 from MBRLAgents import DynaAgent, PrioritizedSweepingAgent
-from Helper import LearningCurvePlot, smooth
+from Helper import LearningCurvePlot,ComparisonPlot, smooth
 
 def experiment():
     n_timesteps = 10001
@@ -20,20 +20,45 @@ def experiment():
     epsilon=0.1
     
     wind_proportions=[0.9,1.0]
-    n_planning_updatess = [1,3,5] 
+    n_planning_updates = [1,3,5] 
+    agents = DynaAgent, PrioritizedSweepingAgent
     
+    for agent in agents:
+        plot = LearningCurvePlot(title=str(agent) + ' learning curves')
+        for wind_proportion in wind_proportions:
+            for n_planning_update in n_planning_updates:
+                print('wind:' + str(wind_proportion) + ', planning_update: ' + str(n_planning_update))
+                mean_rewards = run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportion, n_planning_update, eval_interval, agent)
+                smoothed_rewards = smooth(mean_rewards, window=151)
+                plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='wind:' + str(wind_proportion)+' ,planning_update: ' + str(n_planning_update))
+        if agent == DynaAgent:
+            plot.save('Dyna_learning_curves.png')
+        else:
+            plot.save('PrioritizedSweeping_learning_curves.png')
+    
+    """best_parameters = [[1, 1],
+                       [1, 3]]
+    plot = ComparisonPlot(title='comparisonplot')
+    for agent in range(len(agents)):
+        for wind_proportion in range(len(wind_proportions)):
+            mean_rewards = run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportions[wind_proportion], best_parameters[agent][wind_proportion], eval_interval, agents[agent])
+            smoothed_rewards = smooth(mean_rewards, window=151)
+            plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='wind:' + str(wind_proportions[wind_proportion]) + ', planning_update: ' + str(best_parameters[agent][wind_proportion]))
+    plot.save('comparisonplot.png')   """     
+            
+        
     # IMPLEMENT YOUR EXPERIMENT HERE
 
-def run_repetitions(n_timesteps=1000, n_repetitions=10, gamma=1.0, learning_rate=0.2, epsilon=0.1, wind_proportion=0.9, n_planning_updates=5, eval_interval=250):
+def run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportion, n_planning_updates, eval_interval, agents):
     # IMPLEMENT YOUR FUNCTION HERE
     # This function should run n_repetitions of the Dyna-Q algorithm on the WindyGridworld environment
     # It should return the average return per timestep over all repetitions
     # (This is the value that you should plot in the end)
     env = WindyGridworld(wind_proportion=wind_proportion)
-    agent = PrioritizedSweepingAgent(env.n_states, env.n_actions, learning_rate, gamma)
+    agent = agents(env.n_states, env.n_actions, learning_rate, gamma)
     mean_rewards = np.zeros((n_timesteps))
     for repetition in range(n_repetitions):
-        print(repetition)
+        #print(repetition)
         s = env.reset()
         for timestep in range(n_timesteps):
             if timestep % eval_interval == 0:
@@ -46,11 +71,9 @@ def run_repetitions(n_timesteps=1000, n_repetitions=10, gamma=1.0, learning_rate
                 break
             s = s_next
     mean_rewards /= n_repetitions
-    print(mean_rewards)
+    return mean_rewards
     
-    plot = LearningCurvePlot()
-    plot.add_curve(np.arange(n_timesteps), mean_rewards)
-    plot.save('test.png')
+    
             
     
     
@@ -58,4 +81,4 @@ def run_repetitions(n_timesteps=1000, n_repetitions=10, gamma=1.0, learning_rate
     
 if __name__ == '__main__':
     experiment()
-    run_repetitions()
+    #run_repetitions()

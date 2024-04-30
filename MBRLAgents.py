@@ -49,9 +49,10 @@ class DynaAgent:
 
             estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
             
-            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
+            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0], p=estimate_probability)
             self.Q_sa[s,a] += self.learning_rate * (estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
 
+            
     def evaluate(self,eval_env,n_eval_episodes=30, max_episode_length=100):
         returns = []  # list to store the reward per episode
         for i in range(n_eval_episodes):
@@ -109,7 +110,7 @@ class PrioritizedSweepingAgent:
         self.reward_sums[s,a,s_next] += r
         
         estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
-        s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0], p=estimate_probability)
+        s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
         estimate_r = self.reward_sums[s,a,s_next] / np.sum(self.transition_counts[s,a])
         
         p = np.abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
@@ -120,7 +121,7 @@ class PrioritizedSweepingAgent:
                 break
             _,(s,a) = self.queue.get()
             estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
-            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0], p=estimate_probability)
+            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
             self.Q_sa[s,a] += self.learning_rate * (estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
             
             for s_prime in np.where(self.transition_counts[s,a] > 0)[0]:
