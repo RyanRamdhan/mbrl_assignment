@@ -18,13 +18,14 @@ class DynaAgent:
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.Q_sa = np.zeros((n_states,n_actions))
+        #initialize transition counts and reward sums
         self.means_Q_sa = np.zeros((n_states, n_actions))
         self.transition_counts = np.zeros((n_states,n_actions,n_states))
         self.reward_sums = np.zeros((n_states,n_actions, n_states))
-        # TO DO: Initialize count tables, and reward sum tables. 
+        
         
     def select_action(self, s, epsilon):
-        # TO DO: Change this to e-greedy action selection
+        #e-greedy action selection
         if np.random.rand() < epsilon:
             action = np.random.randint(0, self.n_actions)
         else:
@@ -33,23 +34,31 @@ class DynaAgent:
         return action
         
     def update(self,s,a,r,done,s_next,n_planning_updates):
-        # TO DO: Add Dyna update
+        #update transition counts
         self.transition_counts[s,a,s_next] += 1
+        #update reward sums
         self.reward_sums[s,a,s_next] += r
+        #estimate reward
         estimate_r = self.reward_sums[s,a,s_next] / self.transition_counts[s,a,s_next]
+        #update q table
         self.Q_sa[s,a] += self.learning_rate * (r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
         
+        
         for k in range(n_planning_updates):
+            #find random previously observed state and action
             state_found = False
             while not state_found:
                 s = np.random.choice(np.arange(self.n_states))
                 a = np.random.choice(np.arange(self.n_actions))
                 if np.sum(self.transition_counts[s,a]) > 0:
                     state_found = True
-
+                    
+            #estimate transition probability
             estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
             
-            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0], p=estimate_probability)
+            #update q table with planning
+            s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
+            estimate_r = self.reward_sums[s,a,s_next] / self.transition_counts[s,a,s_next]
             self.Q_sa[s,a] += self.learning_rate * (estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
 
             
@@ -81,13 +90,13 @@ class PrioritizedSweepingAgent:
         self.queue = PriorityQueue()
         
         self.Q_sa = np.zeros((n_states,n_actions))
-        # TO DO: Initialize count tables, reward sum tables, priority queue
+        #initialize transition counts and reward sums
         self.means_Q_sa = np.zeros((n_states, n_actions))
         self.transition_counts = np.zeros((n_states,n_actions,n_states))
         self.reward_sums = np.zeros((n_states,n_actions, n_states))
         
     def select_action(self, s, epsilon):
-        # TO DO: Change this to e-greedy action selection
+        #e-greedy action selection
         
         if np.random.rand() < epsilon:
             action = np.random.randint(0, self.n_actions)
@@ -106,26 +115,40 @@ class PrioritizedSweepingAgent:
         # self.queue.put((-p,(s,a))) 
         # Retrieve the top (s,a) from the queue
         # _,(s,a) = self.queue.get() # get the top (s,a) for the queue
+        
+        #update transition counts
         self.transition_counts[s,a,s_next] += 1
+        #update reward sums
         self.reward_sums[s,a,s_next] += r
         
+        #estimate transition probability
         estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
         s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
+        #estimate reward
         estimate_r = self.reward_sums[s,a,s_next] / np.sum(self.transition_counts[s,a])
         
-        p = np.abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
+        #compute priority p
+        p = np.abs(estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
+    
+        #put (s,a) on the queue with priority p
         if p > self.priority_cutoff:
             self.queue.put((-p,(s,a)))
         for k in range(n_planning_updates):
             if self.queue.empty():
                 break
+            #get top (s,a) from the queue
             _,(s,a) = self.queue.get()
+            #estimate transition probability
             estimate_probability = self.transition_counts[s,a] / np.sum(self.transition_counts[s,a])
+            #update q table 
             s_next = np.random.choice(np.where(self.transition_counts[s,a] > 0)[0])
             self.Q_sa[s,a] += self.learning_rate * (estimate_r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s,a])
             
+            #loop over all state action pairs that can lead to state s
             for s_prime in np.where(self.transition_counts[s,a] > 0)[0]:
+                #get reward from model
                 r = self.reward_sums[s,a,s_prime] / self.transition_counts[s,a,s_prime]
+                #compute priority p
                 p = np.abs(estimate_r + self.gamma * np.max(self.Q_sa[s_prime]) - self.Q_sa[s,a])
                 if p > self.priority_cutoff:
                     self.queue.put((-p,(s,a)))

@@ -19,24 +19,30 @@ def experiment():
     learning_rate = 0.2
     epsilon=0.1
     
+    
     wind_proportions=[0.9,1.0]
     n_planning_updates = [1,3,5] 
     agents = DynaAgent, PrioritizedSweepingAgent
     
+    #make plot for eacht agent
     for agent in agents:
         plot = LearningCurvePlot(title=str(agent) + ' learning curves')
+        #loop over wind_proportions and n_planning_updates
         for wind_proportion in wind_proportions:
             for n_planning_update in n_planning_updates:
                 print('wind:' + str(wind_proportion) + ', planning_update: ' + str(n_planning_update))
+                #run repetitions
                 mean_rewards = run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportion, n_planning_update, eval_interval, agent)
                 smoothed_rewards = smooth(mean_rewards, window=151)
+                #add the mean rewards to plot
                 plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='wind:' + str(wind_proportion)+' ,planning_update: ' + str(n_planning_update))
         if agent == DynaAgent:
             plot.save('Dyna_learning_curves.png')
         else:
             plot.save('PrioritizedSweeping_learning_curves.png')
     
-    """best_parameters = [[1, 1],
+    #make comparison plot
+    best_parameters = [[1, 1],
                        [1, 3]]
     plot = ComparisonPlot(title='comparisonplot')
     for agent in range(len(agents)):
@@ -44,7 +50,7 @@ def experiment():
             mean_rewards = run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, wind_proportions[wind_proportion], best_parameters[agent][wind_proportion], eval_interval, agents[agent])
             smoothed_rewards = smooth(mean_rewards, window=151)
             plot.add_curve(np.arange(n_timesteps), smoothed_rewards, label='wind:' + str(wind_proportions[wind_proportion]) + ', planning_update: ' + str(best_parameters[agent][wind_proportion]))
-    plot.save('comparisonplot.png')   """     
+    plot.save('comparisonplot.png')    
             
         
     # IMPLEMENT YOUR EXPERIMENT HERE
@@ -61,15 +67,19 @@ def run_repetitions(n_timesteps, n_repetitions, gamma, learning_rate, epsilon, w
         #print(repetition)
         s = env.reset()
         for timestep in range(n_timesteps):
+            #evaluate every 250 timesteps
             if timestep % eval_interval == 0:
                 agent.evaluate(env)
+            #select action and update 
             a = agent.select_action(s, epsilon)
             s_next, r, done = env.step(a)
             agent.update(s, a, r, done, s_next, n_planning_updates)
+            #add reward to mean_rewards
             mean_rewards[timestep] += r
             if done:
                 break
             s = s_next
+    #calculate mean rewards
     mean_rewards /= n_repetitions
     return mean_rewards
     
